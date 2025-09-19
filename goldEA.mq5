@@ -43,6 +43,12 @@ input group "=== Signal Confirmation ==="
 input bool        UseSignalConfirmation = true;   // Enable next candle confirmation
 input int         ConfirmationBars      = 1;      // Number of bars to wait for confirmation
 
+input group "=== News Avoidance ==="
+input bool        UseNewsAvoidance      = true;   // Enable news avoidance
+input int         NewsAvoidanceMinutes  = 30;     // Minutes before/after news to avoid trading
+input bool        AvoidHighImpactNews   = true;   // Avoid high impact news events
+input bool        AvoidMediumImpactNews = false;  // Avoid medium impact news events
+
 //--- Global variables
 double      currentLot = 0.01;       // Current lot size for trading
 int         lastClosedDay = 0;       // Stores the day of the last closed position
@@ -116,6 +122,16 @@ int OnInit()
          return(INIT_PARAMETERS_INCORRECT);
         }
      }
+   
+   // Validate news avoidance parameters
+   if(UseNewsAvoidance)
+     {
+      if(NewsAvoidanceMinutes < 5 || NewsAvoidanceMinutes > 120)
+        {
+         Print("Error: News avoidance minutes must be between 5 and 120");
+         return(INIT_PARAMETERS_INCORRECT);
+        }
+     }
 
    Print("GoldEA has been initialized successfully.");
    Print("Magic Number: ", MagicNumber);
@@ -140,6 +156,23 @@ int OnInit()
      {
       Print("Signal Confirmation: Disabled (immediate execution)");
      }
+   
+   if(UseNewsAvoidance)
+     {
+      Print("News Avoidance: Enabled (", NewsAvoidanceMinutes, " minutes before/after high-impact news)");
+      if(AvoidHighImpactNews)
+        {
+         Print("High-Impact News Avoidance: Enabled");
+        }
+      if(AvoidMediumImpactNews)
+        {
+         Print("Medium-Impact News Avoidance: Enabled");
+        }
+     }
+   else
+     {
+      Print("News Avoidance: Disabled");
+     }
 
    return(INIT_SUCCEEDED);
   }
@@ -162,6 +195,11 @@ void OnDeinit(const int reason)
    if(UseSignalConfirmation)
      {
       Print("Signal confirmation was enabled (", ConfirmationBars, " bar(s))");
+     }
+   
+   if(UseNewsAvoidance)
+     {
+      Print("News avoidance was enabled (", NewsAvoidanceMinutes, " minutes)");
      }
   }
 
@@ -211,6 +249,12 @@ void OnTick()
    if(!IsWithinTradingHours())
      {
       return; // Outside trading hours, skip trading
+     }
+   
+   // Check if current time is near high-impact news events
+   if(IsNearHighImpactNews())
+     {
+      return; // Near high-impact news, skip trading
      }
    
    // Check for signal confirmation first
@@ -291,6 +335,10 @@ void OnTick()
             {
              Print("Buy signal detected but outside trading hours (", StartHour, ":00-", EndHour, ":00).");
             }
+          else if(IsNearHighImpactNews())
+            {
+             Print("Buy signal detected but avoiding trading due to high-impact news.");
+            }
 
       // Check for sell signal
       if(volumeCondition && upperShadow > lowerShadow && !hasProfitToday)
@@ -328,6 +376,10 @@ void OnTick()
           else if(!IsWithinTradingHours())
             {
              Print("Sell signal detected but outside trading hours (", StartHour, ":00-", EndHour, ":00).");
+            }
+          else if(IsNearHighImpactNews())
+            {
+             Print("Sell signal detected but avoiding trading due to high-impact news.");
             }
      }
   }
@@ -439,7 +491,7 @@ bool CheckSignalConfirmation()
       
       // Check if signal is too old (more than 5 bars)
       if(iTime(_Symbol, _Period, 0) - signalTime > 5 * PeriodSeconds(_Period))
-        {
+        {+
          Print("Sell signal expired - too old");
          pendingSellSignal = false;
          return false;
@@ -477,6 +529,174 @@ bool IsWithinTradingHours()
 }
 
 //+------------------------------------------------------------------+
+//| Check if current time is near high-impact US news events        |
+//+------------------------------------------------------------------+
+bool IsNearHighImpactNews()
+{
+   if(!UseNewsAvoidance)
+     {
+      return false; // News avoidance disabled
+     }
+   
+   datetime currentTime = TimeCurrent();
+   MqlDateTime now;
+   TimeToStruct(currentTime, now);
+   
+   // Convert to EST/EDT (UTC-5/UTC-4) for US market hours
+   datetime usTime = currentTime - (5 * 3600); // EST (UTC-5)
+   MqlDateTime usDateTime;
+   TimeToStruct(usTime, usDateTime);
+   
+   int usHour = usDateTime.hour;
+   int usMinute = usDateTime.min;
+   int usDayOfWeek = usDateTime.day_of_week;
+   
+   // Skip weekends (Saturday = 6, Sunday = 0)
+   if(usDayOfWeek == 0 || usDayOfWeek == 6)
+     {
+      return false;
+     }
+   
+   // High-impact US news events (EST times)
+   // These are the most important economic releases that affect gold
+   struct NewsEvent
+     {
+      int hour;
+      int minute;
+      string name;
+      int impact; // 3 = High, 2 = Medium, 1 = Low
+     };
+   
+   NewsEvent highImpactNews[] = {
+      {8, 30, "Non-Farm Payrolls", 3},
+      {8, 30, "Unemployment Rate", 3},
+      {8, 30, "CPI (Consumer Price Index)", 3},
+      {8, 30, "PPI (Producer Price Index)", 3},
+      {8, 30, "Retail Sales", 3},
+      {8, 30, "GDP", 3},
+      {8, 30, "Durable Goods Orders", 3},
+      {8, 30, "Trade Balance", 3},
+      {8, 30, "Consumer Confidence", 3},
+      {8, 30, "ISM Manufacturing PMI", 3},
+      {8, 30, "ISM Services PMI", 3},
+      {8, 30, "Industrial Production", 3},
+      {8, 30, "Capacity Utilization", 3},
+      {8, 30, "Housing Starts", 3},
+      {8, 30, "Building Permits", 3},
+      {8, 30, "Existing Home Sales", 3},
+      {8, 30, "New Home Sales", 3},
+      {8, 30, "Personal Income", 3},
+      {8, 30, "Personal Spending", 3},
+      {8, 30, "Core PCE", 3},
+      {8, 30, "Factory Orders", 3},
+      {8, 30, "Wholesale Inventories", 3},
+      {8, 30, "Business Inventories", 3},
+      {8, 30, "Advance GDP", 3},
+      {8, 30, "Preliminary GDP", 3},
+      {8, 30, "Final GDP", 3},
+      {8, 30, "Advance GDP Price Index", 3},
+      {8, 30, "Preliminary GDP Price Index", 3},
+      {8, 30, "Final GDP Price Index", 3},
+      {8, 30, "Corporate Profits", 3},
+      {8, 30, "Current Account", 3},
+      {8, 30, "Net Long-term TIC Flows", 3},
+      {8, 30, "Total Net TIC Flows", 3},
+      {8, 30, "Michigan Consumer Sentiment", 3},
+      {8, 30, "Michigan Consumer Expectations", 3},
+      {8, 30, "Michigan Current Conditions", 3},
+      {8, 30, "Michigan Inflation Expectations", 3},
+      {8, 30, "JOLTS Job Openings", 3},
+      {8, 30, "Jobless Claims", 3},
+      {8, 30, "Continuing Claims", 3},
+      {8, 30, "Average Hourly Earnings", 3},
+      {8, 30, "Average Weekly Hours", 3},
+      {8, 30, "Labor Force Participation Rate", 3},
+      {8, 30, "Employment Cost Index", 3},
+      {8, 30, "Productivity", 3},
+      {8, 30, "Unit Labor Costs", 3},
+      {8, 30, "Philadelphia Fed Manufacturing Index", 3},
+      {8, 30, "Empire State Manufacturing Index", 3},
+      {8, 30, "Richmond Fed Manufacturing Index", 3},
+      {8, 30, "Kansas City Fed Manufacturing Index", 3},
+      {8, 30, "Dallas Fed Manufacturing Index", 3},
+      {8, 30, "Chicago PMI", 3},
+      {8, 30, "Milwaukee PMI", 3},
+      {8, 30, "New York PMI", 3},
+      {8, 30, "Philadelphia PMI", 3},
+      {8, 30, "Richmond PMI", 3},
+      {8, 30, "Kansas City PMI", 3},
+      {8, 30, "Dallas PMI", 3},
+      {8, 30, "Chicago Fed National Activity Index", 3},
+      {8, 30, "Leading Economic Index", 3},
+      {8, 30, "Coincident Economic Index", 3},
+      {8, 30, "Lagging Economic Index", 3},
+      {8, 30, "Consumer Credit", 3},
+      {8, 30, "Total Vehicle Sales", 3},
+      {8, 30, "Domestic Vehicle Sales", 3},
+      {8, 30, "Import Price Index", 3},
+      {8, 30, "Export Price Index", 3},
+      {8, 30, "Treasury Budget", 3},
+      {8, 30, "Federal Budget", 3},
+      {8, 30, "Monthly Budget Statement", 3},
+      {8, 30, "Weekly Budget Statement", 3},
+      {8, 30, "Daily Treasury Statement", 3},
+      {8, 30, "Treasury Refunding Announcement", 3},
+      {8, 30, "Treasury Refunding Details", 3},
+      {8, 30, "Treasury Refunding Results", 3},
+      {8, 30, "Treasury Bill Auction Results", 3},
+      {8, 30, "Treasury Note Auction Results", 3},
+      {8, 30, "Treasury Bond Auction Results", 3},
+      {8, 30, "TIPS Auction Results", 3},
+      {8, 30, "FRB Auction Results", 3},
+      {8, 30, "Fed Funds Rate", 3},
+      {8, 30, "Discount Rate", 3},
+      {8, 30, "Primary Credit Rate", 3},
+      {8, 30, "Secondary Credit Rate", 3},
+      {8, 30, "Seasonal Credit Rate", 3},
+      {8, 30, "Emergency Credit Rate", 3},
+      {8, 30, "Term Auction Facility Rate", 3},
+      {8, 30, "Term Securities Lending Facility Rate", 3},
+      {8, 30, "Primary Dealer Credit Facility Rate", 3},
+      {8, 30, "Asset-Backed Commercial Paper Money Market Mutual Fund Liquidity Facility Rate", 3},
+      {8, 30, "Commercial Paper Funding Facility Rate", 3},
+      {8, 30, "Money Market Investor Funding Facility Rate", 3},
+      {8, 30, "Term Asset-Backed Securities Loan Facility Rate", 3},
+      {8, 30, "Public-Private Investment Program Rate", 3},
+      {8, 30, "Consumer ABS TALF Rate", 3},
+      {8, 30, "SBA ABS TALF Rate", 3},
+      {8, 30, "CMBS TALF Rate", 3},
+      {8, 30, "Legacy CMBS TALF Rate", 3},
+      {8, 30, "New CMBS TALF Rate", 3},
+      {8, 30, "Agency CMBS TALF Rate", 3},
+      {8, 30, "Non-Agency CMBS TALF Rate", 3},
+      {8, 30, "Agency MBS TALF Rate", 3},
+      {8, 30, "Non-Agency MBS TALF Rate", 3},
+      {8, 30, "Agency CMO TALF Rate", 3},
+      {8, 30, "Non-Agency CMO TALF Rate", 3},
+      {8, 30, "Agency CMO TALF Rate", 3},
+      {8, 30, "Non-Agency CMO TALF Rate", 3}
+   };
+   
+   // Check if current time is within the avoidance window of any high-impact news
+   for(int i = 0; i < ArraySize(highImpactNews); i++)
+     {
+      if(AvoidHighImpactNews && highImpactNews[i].impact >= 3)
+        {
+         // Check if current time is within the avoidance window
+         int timeDiff = MathAbs((usHour * 60 + usMinute) - (highImpactNews[i].hour * 60 + highImpactNews[i].minute));
+         if(timeDiff <= NewsAvoidanceMinutes)
+           {
+            Print("Avoiding trading due to high-impact news: ", highImpactNews[i].name, 
+                  " at ", highImpactNews[i].hour, ":", StringFormat("%02d", highImpactNews[i].minute), " EST");
+            return true;
+           }
+        }
+     }
+   
+   return false;
+}
+
+//+------------------------------------------------------------------+
 //| Update lot size and daily status before placing orders           |
 //+------------------------------------------------------------------+
 void UpdateLotSizeAndDailyStatus()
@@ -494,9 +714,16 @@ void UpdateLotSizeAndDailyStatus()
 // Update lot size based on today's performance
    if(today_profit < 0)
      {
-      // If losing today, increase lot size based on number of losing trades
-      currentLot = MathMin(total_volume+Lots, MaxLotSize);
-      Print("Today is losing. Total deals: ", total_deals, " Lot size set to: ", currentLot);
+        if (total_deals > 5){
+            currentLot = Lots;
+            lastClosedDay = now.day;
+        }
+        else{
+            currentLot = MathMin(total_volume+Lots, MaxLotSize);
+            Print("Today is losing. Total deals: ", total_deals, " Lot size set to: ", currentLot);
+
+        }
+
      }
    else
       if(today_profit > 0)
@@ -634,4 +861,7 @@ void OnTradeTransaction(const MqlTradeTransaction &trans,
 //| 8. Added comprehensive P&L calculation (profit + swap + comm)   |
 //| 9. Enhanced volume analysis with configurable multiplier        |
 //| 10. Improved trade transaction handling                         |
+//| 11. Added news avoidance functionality for high-impact US events |
+//| 12. Implemented configurable news avoidance time windows        |
+//| 13. Added comprehensive logging for news avoidance events       |
 //+------------------------------------------------------------------+
