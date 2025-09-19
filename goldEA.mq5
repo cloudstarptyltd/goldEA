@@ -49,6 +49,9 @@ input int         NewsAvoidanceMinutes  = 30;     // Minutes before/after news t
 input bool        AvoidHighImpactNews   = true;   // Avoid high impact news events
 input bool        AvoidMediumImpactNews = false;  // Avoid medium impact news events
 
+input group "=== Daily Status ==="
+input bool        ShowYesterdayStatus   = true;   // Show yesterday's profit/loss status on startup
+
 //--- Global variables
 double      currentLot = 0.01;       // Current lot size for trading
 int         lastClosedDay = 0;       // Stores the day of the last closed position
@@ -172,6 +175,14 @@ int OnInit()
    else
      {
       Print("News Avoidance: Disabled");
+     }
+   
+   // Check yesterday's status if enabled
+   if(ShowYesterdayStatus)
+     {
+      Print("=== YESTERDAY'S TRADING STATUS ===");
+      CheckYesterdayStatus();
+      Print("=====================================");
      }
 
    return(INIT_SUCCEEDED);
@@ -727,12 +738,12 @@ void UpdateLotSizeAndDailyStatus()
          TimeToStruct(TimeCurrent(), now);
          lastClosedDay = now.day;
         }
-      else
-        {
-         currentLot = MathMin(total_volume+Lots, MaxLotSize);
-         Print("Today is losing. Total deals: ", total_deals, " Lot size set to: ", currentLot);
+       else
+         {
+          currentLot = MathMin(total_volume+Lots, MaxLotSize);
+          Print("Today is losing. Total deals: ", total_deals, " Lot size set to: ", currentLot);
 
-        }
+         }
 
      }
    else
@@ -821,6 +832,85 @@ double Calculatevolume(datetime from_date, datetime to_date)
    Print("Calculated deal_volume for ", TimeToString(from_date), " to ", TimeToString(to_date), " is: ", deal_volume);
    return deal_volume;
   }
+
+//+------------------------------------------------------------------+
+//| Check yesterday's profit/loss status                            |
+//+------------------------------------------------------------------+
+double CheckYesterdayStatus()
+  {
+   // Calculate yesterday's date range
+   datetime currentTime = TimeCurrent();
+   MqlDateTime now;
+   TimeToStruct(currentTime, now);
+   
+   // Get yesterday's date
+   datetime yesterday = currentTime - 86400; // Subtract 1 day (86400 seconds)
+   MqlDateTime yesterdayStruct;
+   TimeToStruct(yesterday, yesterdayStruct);
+   
+   // Calculate yesterday's start and end times
+   datetime yesterday_start = yesterday - (yesterday % 86400);
+   datetime yesterday_end = yesterday_start + 86400 - 1;
+   
+   // Calculate yesterday's profit
+   double yesterday_profit = CalculateDailyProfit(yesterday_start, yesterday_end);
+   double yesterday_deals = Calculatetotaldeals(yesterday_start, yesterday_end);
+   double yesterday_volume = Calculatevolume(yesterday_start, yesterday_end);
+   
+   // Print yesterday's status
+   if(yesterday_profit > 0)
+     {
+      Print("YESTERDAY WAS PROFITABLE: Profit = ", yesterday_profit, 
+            " | Deals = ", yesterday_deals, " | Volume = ", yesterday_volume);
+     }
+   else if(yesterday_profit < 0)
+     {
+      Print("YESTERDAY WAS A LOSS: Loss = ", yesterday_profit, 
+            " | Deals = ", yesterday_deals, " | Volume = ", yesterday_volume);
+     }
+   else
+     {
+      Print("YESTERDAY WAS BREAK-EVEN: Profit = ", yesterday_profit, 
+            " | Deals = ", yesterday_deals, " | Volume = ", yesterday_volume);
+     }
+   
+   return yesterday_profit;
+  }
+
+//+------------------------------------------------------------------+
+//| Get yesterday's profit/loss status (returns string)            |
+//+------------------------------------------------------------------+
+string GetYesterdayStatusString()
+  {
+   // Calculate yesterday's date range
+   datetime currentTime = TimeCurrent();
+   datetime yesterday = currentTime - 86400; // Subtract 1 day (86400 seconds)
+   
+   // Calculate yesterday's start and end times
+   datetime yesterday_start = yesterday - (yesterday % 86400);
+   datetime yesterday_end = yesterday_start + 86400 - 1;
+   
+   // Calculate yesterday's profit
+   double yesterday_profit = CalculateDailyProfit(yesterday_start, yesterday_end);
+   double yesterday_deals = Calculatetotaldeals(yesterday_start, yesterday_end);
+   
+   // Return status string
+   if(yesterday_profit > 0)
+     {
+      return "YESTERDAY WAS PROFITABLE: Profit = " + DoubleToString(yesterday_profit, 2) + 
+             " | Deals = " + DoubleToString(yesterday_deals, 0);
+     }
+   else if(yesterday_profit < 0)
+     {
+      return "YESTERDAY WAS A LOSS: Loss = " + DoubleToString(yesterday_profit, 2) + 
+             " | Deals = " + DoubleToString(yesterday_deals, 0);
+     }
+   else
+     {
+      return "YESTERDAY WAS BREAK-EVEN: Profit = " + DoubleToString(yesterday_profit, 2) + 
+             " | Deals = " + DoubleToString(yesterday_deals, 0);
+     }
+  }
 //+------------------------------------------------------------------+
 //| OnTradeTransaction event handler                                 |
 //| This function handles trade transaction events.                  |
@@ -874,4 +964,6 @@ void OnTradeTransaction(const MqlTradeTransaction &trans,
 //| 11. Added news avoidance functionality for high-impact US events |
 //| 12. Implemented configurable news avoidance time windows        |
 //| 13. Added comprehensive logging for news avoidance events       |
+//| 14. Added yesterday's profit/loss status checking functionality |
+//| 15. Fixed profit/loss message labeling in daily status updates  |
 //+------------------------------------------------------------------+
