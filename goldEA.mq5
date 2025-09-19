@@ -97,8 +97,8 @@ int OnInit()
       Print("Error: Stop Loss and Take Profit must be greater than 0");
       return(INIT_PARAMETERS_INCORRECT);
      }
-   
-   // Validate trading hours parameters
+
+// Validate trading hours parameters
    if(UseTradingHours)
      {
       if(StartHour < 0 || StartHour > 23 || EndHour < 0 || EndHour > 23)
@@ -112,8 +112,8 @@ int OnInit()
          return(INIT_PARAMETERS_INCORRECT);
         }
      }
-   
-   // Validate signal confirmation parameters
+
+// Validate signal confirmation parameters
    if(UseSignalConfirmation)
      {
       if(ConfirmationBars < 1 || ConfirmationBars > 5)
@@ -122,8 +122,8 @@ int OnInit()
          return(INIT_PARAMETERS_INCORRECT);
         }
      }
-   
-   // Validate news avoidance parameters
+
+// Validate news avoidance parameters
    if(UseNewsAvoidance)
      {
       if(NewsAvoidanceMinutes < 5 || NewsAvoidanceMinutes > 120)
@@ -138,7 +138,7 @@ int OnInit()
    Print("Initial Lot Size: ", currentLot);
    Print("Stop Loss: ", StopLoss_Points, " points");
    Print("Take Profit: ", TakeProfit_Points, " points");
-   
+
    if(UseTradingHours)
      {
       Print("Trading Hours: ", StartHour, ":00 to ", EndHour, ":00 (24-hour format)");
@@ -147,7 +147,7 @@ int OnInit()
      {
       Print("Trading Hours: 24/7 (no restrictions)");
      }
-   
+
    if(UseSignalConfirmation)
      {
       Print("Signal Confirmation: Enabled (", ConfirmationBars, " bar(s) confirmation)");
@@ -156,7 +156,7 @@ int OnInit()
      {
       Print("Signal Confirmation: Disabled (immediate execution)");
      }
-   
+
    if(UseNewsAvoidance)
      {
       Print("News Avoidance: Enabled (", NewsAvoidanceMinutes, " minutes before/after high-impact news)");
@@ -186,17 +186,17 @@ void OnDeinit(const int reason)
    Print("GoldEA has been deinitialized. Reason: ", reason);
    Print("Final lot size: ", currentLot);
    Print("Trading was active: ", isTradingActive);
-   
+
    if(UseTradingHours)
      {
       Print("Trading hours were: ", StartHour, ":00 to ", EndHour, ":00");
      }
-   
+
    if(UseSignalConfirmation)
      {
       Print("Signal confirmation was enabled (", ConfirmationBars, " bar(s))");
      }
-   
+
    if(UseNewsAvoidance)
      {
       Print("News avoidance was enabled (", NewsAvoidanceMinutes, " minutes)");
@@ -244,20 +244,20 @@ void OnTick()
      {
       return;
      }
-   
-   // Check if current time is within trading hours
+
+// Check if current time is within trading hours
    if(!IsWithinTradingHours())
      {
       return; // Outside trading hours, skip trading
      }
-   
-   // Check if current time is near high-impact news events
+
+// Check if current time is near high-impact news events
    if(IsNearHighImpactNews())
      {
       return; // Near high-impact news, skip trading
      }
-   
-   // Check for signal confirmation first
+
+// Check for signal confirmation first
    if(CheckSignalConfirmation())
      {
       // Signal confirmed, proceed with trade execution
@@ -298,47 +298,49 @@ void OnTick()
 
       bool volumeCondition = tick_volumes[0] > (tick_volumes[1] * VolumeMultiplier);
 
-       // Check for buy signal
-       if(volumeCondition && lowerShadow > upperShadow && !hasProfitToday)
-         {
-          if(UseSignalConfirmation)
-            {
-             // Set pending buy signal for confirmation
-             pendingBuySignal = true;
-             signalCandleHigh = high_prices[0];
-             signalTime = iTime(_Symbol, _Period, 0);
-             Print("Buy signal detected - waiting for confirmation. Signal high: ", signalCandleHigh);
-            }
-          else
-            {
-             // Immediate execution (confirmation disabled)
-             double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
-             double sl = ask - StopLoss_Points * point_value;
-             double tp = ask + TakeProfit_Points * point_value;
+      // Check for buy signal
+      if(volumeCondition && lowerShadow > upperShadow && !hasProfitToday)
+        {
+         if(UseSignalConfirmation)
+           {
+            // Set pending buy signal for confirmation
+            pendingBuySignal = true;
+            signalCandleHigh = high_prices[0];
+            signalTime = iTime(_Symbol, _Period, 0);
+            Print("Buy signal detected - waiting for confirmation. Signal high: ", signalCandleHigh);
+           }
+         else
+           {
+            // Immediate execution (confirmation disabled)
+            double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+            double sl = ask - StopLoss_Points * point_value;
+            double tp = ask + TakeProfit_Points * point_value;
 
-             if(trade.Buy(currentLot, _Symbol, ask, sl, tp, "GoldEA Buy Signal"))
-               {
-                Print("Buy order successfully sent. Volume: ", currentLot, " Price: ", ask);
-               }
-             else
-               {
-                Print("Buy order failed. Error: ", trade.ResultRetcode(), " - ", trade.ResultComment());
-               }
-            }
-         }
-       else
-          if(hasProfitToday)
-            {
-             Print("Buy signal detected but trading stopped for today due to profit.");
-            }
-          else if(!IsWithinTradingHours())
-            {
-             Print("Buy signal detected but outside trading hours (", StartHour, ":00-", EndHour, ":00).");
-            }
-          else if(IsNearHighImpactNews())
-            {
-             Print("Buy signal detected but avoiding trading due to high-impact news.");
-            }
+            if(trade.Buy(currentLot, _Symbol, ask, sl, tp, "GoldEA Buy Signal"))
+              {
+               Print("Buy order successfully sent. Volume: ", currentLot, " Price: ", ask);
+              }
+            else
+              {
+               Print("Buy order failed. Error: ", trade.ResultRetcode(), " - ", trade.ResultComment());
+              }
+           }
+        }
+      else
+         if(hasProfitToday)
+           {
+            Print("Buy signal detected but trading stopped for today due to profit.");
+           }
+         else
+            if(!IsWithinTradingHours())
+              {
+               Print("Buy signal detected but outside trading hours (", StartHour, ":00-", EndHour, ":00).");
+              }
+            else
+               if(IsNearHighImpactNews())
+                 {
+                  Print("Buy signal detected but avoiding trading due to high-impact news.");
+                 }
 
       // Check for sell signal
       if(volumeCondition && upperShadow > lowerShadow && !hasProfitToday)
@@ -368,19 +370,21 @@ void OnTick()
               }
            }
         }
-       else
-          if(hasProfitToday)
-            {
-             Print("Sell signal detected but trading stopped for today due to profit.");
-            }
-          else if(!IsWithinTradingHours())
-            {
-             Print("Sell signal detected but outside trading hours (", StartHour, ":00-", EndHour, ":00).");
-            }
-          else if(IsNearHighImpactNews())
-            {
-             Print("Sell signal detected but avoiding trading due to high-impact news.");
-            }
+      else
+         if(hasProfitToday)
+           {
+            Print("Sell signal detected but trading stopped for today due to profit.");
+           }
+         else
+            if(!IsWithinTradingHours())
+              {
+               Print("Sell signal detected but outside trading hours (", StartHour, ":00-", EndHour, ":00).");
+              }
+            else
+               if(IsNearHighImpactNews())
+                 {
+                  Print("Sell signal detected but avoiding trading due to high-impact news.");
+                 }
      }
   }
 
@@ -388,7 +392,7 @@ void OnTick()
 //| Execute confirmed trade based on pending signal                  |
 //+------------------------------------------------------------------+
 void ExecuteConfirmedTrade()
-{
+  {
    if(pendingBuySignal)
      {
       // Execute confirmed buy trade
@@ -396,7 +400,7 @@ void ExecuteConfirmedTrade()
       double point_value = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
       double sl = ask - StopLoss_Points * point_value;
       double tp = ask + TakeProfit_Points * point_value;
-      
+
       if(trade.Buy(currentLot, _Symbol, ask, sl, tp, "GoldEA Confirmed Buy Signal"))
         {
          Print("Confirmed buy order executed. Volume: ", currentLot, " Price: ", ask);
@@ -407,43 +411,44 @@ void ExecuteConfirmedTrade()
          Print("Confirmed buy order failed. Error: ", trade.ResultRetcode(), " - ", trade.ResultComment());
         }
      }
-   else if(pendingSellSignal)
-     {
-      // Execute confirmed sell trade
-      double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-      double point_value = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
-      double sl = bid + StopLoss_Points * point_value;
-      double tp = bid - TakeProfit_Points * point_value;
-      
-      if(trade.Sell(currentLot, _Symbol, bid, sl, tp, "GoldEA Confirmed Sell Signal"))
+   else
+      if(pendingSellSignal)
         {
-         Print("Confirmed sell order executed. Volume: ", currentLot, " Price: ", bid);
-         pendingSellSignal = false;
+         // Execute confirmed sell trade
+         double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+         double point_value = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+         double sl = bid + StopLoss_Points * point_value;
+         double tp = bid - TakeProfit_Points * point_value;
+
+         if(trade.Sell(currentLot, _Symbol, bid, sl, tp, "GoldEA Confirmed Sell Signal"))
+           {
+            Print("Confirmed sell order executed. Volume: ", currentLot, " Price: ", bid);
+            pendingSellSignal = false;
+           }
+         else
+           {
+            Print("Confirmed sell order failed. Error: ", trade.ResultRetcode(), " - ", trade.ResultComment());
+           }
         }
-      else
-        {
-         Print("Confirmed sell order failed. Error: ", trade.ResultRetcode(), " - ", trade.ResultComment());
-        }
-     }
-}
+  }
 
 //+------------------------------------------------------------------+
 //| Check signal confirmation for buy/sell signals                   |
 //+------------------------------------------------------------------+
 bool CheckSignalConfirmation()
-{
+  {
    if(!UseSignalConfirmation)
      {
       return true; // Signal confirmation disabled
      }
-   
-   // Check if we have pending signals
+
+// Check if we have pending signals
    if(!pendingBuySignal && !pendingSellSignal)
      {
       return false; // No pending signals
      }
-   
-   // Get current candle data for confirmation
+
+// Get current candle data for confirmation
    double currentHigh[], currentLow[];
    if(CopyHigh(_Symbol, _Period, 0, ConfirmationBars, currentHigh) < ConfirmationBars ||
       CopyLow(_Symbol, _Period, 0, ConfirmationBars, currentLow) < ConfirmationBars)
@@ -451,8 +456,8 @@ bool CheckSignalConfirmation()
       Print("Failed to get confirmation candle data");
       return false;
      }
-   
-   // Check buy signal confirmation
+
+// Check buy signal confirmation
    if(pendingBuySignal)
      {
       // Check if any of the confirmation bars have high above signal candle high
@@ -465,7 +470,7 @@ bool CheckSignalConfirmation()
             return true;
            }
         }
-      
+
       // Check if signal is too old (more than 5 bars)
       if(iTime(_Symbol, _Period, 0) - signalTime > 5 * PeriodSeconds(_Period))
         {
@@ -474,8 +479,8 @@ bool CheckSignalConfirmation()
          return false;
         }
      }
-   
-   // Check sell signal confirmation
+
+// Check sell signal confirmation
    if(pendingSellSignal)
      {
       // Check if any of the confirmation bars have low below signal candle low
@@ -488,196 +493,197 @@ bool CheckSignalConfirmation()
             return true;
            }
         }
-      
+
       // Check if signal is too old (more than 5 bars)
       if(iTime(_Symbol, _Period, 0) - signalTime > 5 * PeriodSeconds(_Period))
-        {+
+        {
          Print("Sell signal expired - too old");
          pendingSellSignal = false;
          return false;
         }
      }
-   
+
    return false; // Signal not confirmed yet
-}
+  }
 
 //+------------------------------------------------------------------+
 //| Check if current time is within trading hours                    |
 //+------------------------------------------------------------------+
 bool IsWithinTradingHours()
-{
+  {
    if(!UseTradingHours)
      {
       return true; // Trading hours disabled, allow trading 24/7
      }
-   
+
    MqlDateTime now;
    TimeToStruct(TimeCurrent(), now);
-   
+
    int currentHour = now.hour;
-   
-   // Handle normal case (start hour < end hour)
+
+// Handle normal case (start hour < end hour)
    if(StartHour < EndHour)
      {
       return (currentHour >= StartHour && currentHour < EndHour);
      }
-   // Handle overnight case (start hour > end hour, e.g., 22:00 to 06:00)
+// Handle overnight case (start hour > end hour, e.g., 22:00 to 06:00)
    else
      {
       return (currentHour >= StartHour || currentHour < EndHour);
      }
-}
+  }
 
 //+------------------------------------------------------------------+
 //| Check if current time is near high-impact US news events        |
 //+------------------------------------------------------------------+
 bool IsNearHighImpactNews()
-{
+  {
    if(!UseNewsAvoidance)
      {
       return false; // News avoidance disabled
      }
-   
+
    datetime currentTime = TimeCurrent();
    MqlDateTime now;
    TimeToStruct(currentTime, now);
-   
-   // Convert to EST/EDT (UTC-5/UTC-4) for US market hours
+
+// Convert to EST/EDT (UTC-5/UTC-4) for US market hours
    datetime usTime = currentTime - (5 * 3600); // EST (UTC-5)
    MqlDateTime usDateTime;
    TimeToStruct(usTime, usDateTime);
-   
+
    int usHour = usDateTime.hour;
    int usMinute = usDateTime.min;
    int usDayOfWeek = usDateTime.day_of_week;
-   
-   // Skip weekends (Saturday = 6, Sunday = 0)
+
+// Skip weekends (Saturday = 6, Sunday = 0)
    if(usDayOfWeek == 0 || usDayOfWeek == 6)
      {
       return false;
      }
-   
-   // High-impact US news events (EST times)
-   // These are the most important economic releases that affect gold
+
+// High-impact US news events (EST times)
+// These are the most important economic releases that affect gold
    struct NewsEvent
      {
-      int hour;
-      int minute;
-      string name;
-      int impact; // 3 = High, 2 = Medium, 1 = Low
+      int            hour;
+      int            minute;
+      string         name;
+      int            impact; // 3 = High, 2 = Medium, 1 = Low
      };
-   
-   NewsEvent highImpactNews[] = {
-      {8, 30, "Non-Farm Payrolls", 3},
-      {8, 30, "Unemployment Rate", 3},
-      {8, 30, "CPI (Consumer Price Index)", 3},
-      {8, 30, "PPI (Producer Price Index)", 3},
-      {8, 30, "Retail Sales", 3},
-      {8, 30, "GDP", 3},
-      {8, 30, "Durable Goods Orders", 3},
-      {8, 30, "Trade Balance", 3},
-      {8, 30, "Consumer Confidence", 3},
-      {8, 30, "ISM Manufacturing PMI", 3},
-      {8, 30, "ISM Services PMI", 3},
-      {8, 30, "Industrial Production", 3},
-      {8, 30, "Capacity Utilization", 3},
-      {8, 30, "Housing Starts", 3},
-      {8, 30, "Building Permits", 3},
-      {8, 30, "Existing Home Sales", 3},
-      {8, 30, "New Home Sales", 3},
-      {8, 30, "Personal Income", 3},
-      {8, 30, "Personal Spending", 3},
-      {8, 30, "Core PCE", 3},
-      {8, 30, "Factory Orders", 3},
-      {8, 30, "Wholesale Inventories", 3},
-      {8, 30, "Business Inventories", 3},
-      {8, 30, "Advance GDP", 3},
-      {8, 30, "Preliminary GDP", 3},
-      {8, 30, "Final GDP", 3},
-      {8, 30, "Advance GDP Price Index", 3},
-      {8, 30, "Preliminary GDP Price Index", 3},
-      {8, 30, "Final GDP Price Index", 3},
-      {8, 30, "Corporate Profits", 3},
-      {8, 30, "Current Account", 3},
-      {8, 30, "Net Long-term TIC Flows", 3},
-      {8, 30, "Total Net TIC Flows", 3},
-      {8, 30, "Michigan Consumer Sentiment", 3},
-      {8, 30, "Michigan Consumer Expectations", 3},
-      {8, 30, "Michigan Current Conditions", 3},
-      {8, 30, "Michigan Inflation Expectations", 3},
-      {8, 30, "JOLTS Job Openings", 3},
-      {8, 30, "Jobless Claims", 3},
-      {8, 30, "Continuing Claims", 3},
-      {8, 30, "Average Hourly Earnings", 3},
-      {8, 30, "Average Weekly Hours", 3},
-      {8, 30, "Labor Force Participation Rate", 3},
-      {8, 30, "Employment Cost Index", 3},
-      {8, 30, "Productivity", 3},
-      {8, 30, "Unit Labor Costs", 3},
-      {8, 30, "Philadelphia Fed Manufacturing Index", 3},
-      {8, 30, "Empire State Manufacturing Index", 3},
-      {8, 30, "Richmond Fed Manufacturing Index", 3},
-      {8, 30, "Kansas City Fed Manufacturing Index", 3},
-      {8, 30, "Dallas Fed Manufacturing Index", 3},
-      {8, 30, "Chicago PMI", 3},
-      {8, 30, "Milwaukee PMI", 3},
-      {8, 30, "New York PMI", 3},
-      {8, 30, "Philadelphia PMI", 3},
-      {8, 30, "Richmond PMI", 3},
-      {8, 30, "Kansas City PMI", 3},
-      {8, 30, "Dallas PMI", 3},
-      {8, 30, "Chicago Fed National Activity Index", 3},
-      {8, 30, "Leading Economic Index", 3},
-      {8, 30, "Coincident Economic Index", 3},
-      {8, 30, "Lagging Economic Index", 3},
-      {8, 30, "Consumer Credit", 3},
-      {8, 30, "Total Vehicle Sales", 3},
-      {8, 30, "Domestic Vehicle Sales", 3},
-      {8, 30, "Import Price Index", 3},
-      {8, 30, "Export Price Index", 3},
-      {8, 30, "Treasury Budget", 3},
-      {8, 30, "Federal Budget", 3},
-      {8, 30, "Monthly Budget Statement", 3},
-      {8, 30, "Weekly Budget Statement", 3},
-      {8, 30, "Daily Treasury Statement", 3},
-      {8, 30, "Treasury Refunding Announcement", 3},
-      {8, 30, "Treasury Refunding Details", 3},
-      {8, 30, "Treasury Refunding Results", 3},
-      {8, 30, "Treasury Bill Auction Results", 3},
-      {8, 30, "Treasury Note Auction Results", 3},
-      {8, 30, "Treasury Bond Auction Results", 3},
-      {8, 30, "TIPS Auction Results", 3},
-      {8, 30, "FRB Auction Results", 3},
-      {8, 30, "Fed Funds Rate", 3},
-      {8, 30, "Discount Rate", 3},
-      {8, 30, "Primary Credit Rate", 3},
-      {8, 30, "Secondary Credit Rate", 3},
-      {8, 30, "Seasonal Credit Rate", 3},
-      {8, 30, "Emergency Credit Rate", 3},
-      {8, 30, "Term Auction Facility Rate", 3},
-      {8, 30, "Term Securities Lending Facility Rate", 3},
-      {8, 30, "Primary Dealer Credit Facility Rate", 3},
-      {8, 30, "Asset-Backed Commercial Paper Money Market Mutual Fund Liquidity Facility Rate", 3},
-      {8, 30, "Commercial Paper Funding Facility Rate", 3},
-      {8, 30, "Money Market Investor Funding Facility Rate", 3},
-      {8, 30, "Term Asset-Backed Securities Loan Facility Rate", 3},
-      {8, 30, "Public-Private Investment Program Rate", 3},
-      {8, 30, "Consumer ABS TALF Rate", 3},
-      {8, 30, "SBA ABS TALF Rate", 3},
-      {8, 30, "CMBS TALF Rate", 3},
-      {8, 30, "Legacy CMBS TALF Rate", 3},
-      {8, 30, "New CMBS TALF Rate", 3},
-      {8, 30, "Agency CMBS TALF Rate", 3},
-      {8, 30, "Non-Agency CMBS TALF Rate", 3},
-      {8, 30, "Agency MBS TALF Rate", 3},
-      {8, 30, "Non-Agency MBS TALF Rate", 3},
-      {8, 30, "Agency CMO TALF Rate", 3},
-      {8, 30, "Non-Agency CMO TALF Rate", 3},
-      {8, 30, "Agency CMO TALF Rate", 3},
-      {8, 30, "Non-Agency CMO TALF Rate", 3}
-   };
-   
-   // Check if current time is within the avoidance window of any high-impact news
+
+   NewsEvent highImpactNews[] =
+     {
+        {8, 30, "Non-Farm Payrolls", 3},
+        {8, 30, "Unemployment Rate", 3},
+        {8, 30, "CPI (Consumer Price Index)", 3},
+        {8, 30, "PPI (Producer Price Index)", 3},
+        {8, 30, "Retail Sales", 3},
+        {8, 30, "GDP", 3},
+        {8, 30, "Durable Goods Orders", 3},
+        {8, 30, "Trade Balance", 3},
+        {8, 30, "Consumer Confidence", 3},
+        {8, 30, "ISM Manufacturing PMI", 3},
+        {8, 30, "ISM Services PMI", 3},
+        {8, 30, "Industrial Production", 3},
+        {8, 30, "Capacity Utilization", 3},
+        {8, 30, "Housing Starts", 3},
+        {8, 30, "Building Permits", 3},
+        {8, 30, "Existing Home Sales", 3},
+        {8, 30, "New Home Sales", 3},
+        {8, 30, "Personal Income", 3},
+        {8, 30, "Personal Spending", 3},
+        {8, 30, "Core PCE", 3},
+        {8, 30, "Factory Orders", 3},
+        {8, 30, "Wholesale Inventories", 3},
+        {8, 30, "Business Inventories", 3},
+        {8, 30, "Advance GDP", 3},
+        {8, 30, "Preliminary GDP", 3},
+        {8, 30, "Final GDP", 3},
+        {8, 30, "Advance GDP Price Index", 3},
+        {8, 30, "Preliminary GDP Price Index", 3},
+        {8, 30, "Final GDP Price Index", 3},
+        {8, 30, "Corporate Profits", 3},
+        {8, 30, "Current Account", 3},
+        {8, 30, "Net Long-term TIC Flows", 3},
+        {8, 30, "Total Net TIC Flows", 3},
+        {8, 30, "Michigan Consumer Sentiment", 3},
+        {8, 30, "Michigan Consumer Expectations", 3},
+        {8, 30, "Michigan Current Conditions", 3},
+        {8, 30, "Michigan Inflation Expectations", 3},
+        {8, 30, "JOLTS Job Openings", 3},
+        {8, 30, "Jobless Claims", 3},
+        {8, 30, "Continuing Claims", 3},
+        {8, 30, "Average Hourly Earnings", 3},
+        {8, 30, "Average Weekly Hours", 3},
+        {8, 30, "Labor Force Participation Rate", 3},
+        {8, 30, "Employment Cost Index", 3},
+        {8, 30, "Productivity", 3},
+        {8, 30, "Unit Labor Costs", 3},
+        {8, 30, "Philadelphia Fed Manufacturing Index", 3},
+        {8, 30, "Empire State Manufacturing Index", 3},
+        {8, 30, "Richmond Fed Manufacturing Index", 3},
+        {8, 30, "Kansas City Fed Manufacturing Index", 3},
+        {8, 30, "Dallas Fed Manufacturing Index", 3},
+        {8, 30, "Chicago PMI", 3},
+        {8, 30, "Milwaukee PMI", 3},
+        {8, 30, "New York PMI", 3},
+        {8, 30, "Philadelphia PMI", 3},
+        {8, 30, "Richmond PMI", 3},
+        {8, 30, "Kansas City PMI", 3},
+        {8, 30, "Dallas PMI", 3},
+        {8, 30, "Chicago Fed National Activity Index", 3},
+        {8, 30, "Leading Economic Index", 3},
+        {8, 30, "Coincident Economic Index", 3},
+        {8, 30, "Lagging Economic Index", 3},
+        {8, 30, "Consumer Credit", 3},
+        {8, 30, "Total Vehicle Sales", 3},
+        {8, 30, "Domestic Vehicle Sales", 3},
+        {8, 30, "Import Price Index", 3},
+        {8, 30, "Export Price Index", 3},
+        {8, 30, "Treasury Budget", 3},
+        {8, 30, "Federal Budget", 3},
+        {8, 30, "Monthly Budget Statement", 3},
+        {8, 30, "Weekly Budget Statement", 3},
+        {8, 30, "Daily Treasury Statement", 3},
+        {8, 30, "Treasury Refunding Announcement", 3},
+        {8, 30, "Treasury Refunding Details", 3},
+        {8, 30, "Treasury Refunding Results", 3},
+        {8, 30, "Treasury Bill Auction Results", 3},
+        {8, 30, "Treasury Note Auction Results", 3},
+        {8, 30, "Treasury Bond Auction Results", 3},
+        {8, 30, "TIPS Auction Results", 3},
+        {8, 30, "FRB Auction Results", 3},
+        {8, 30, "Fed Funds Rate", 3},
+        {8, 30, "Discount Rate", 3},
+        {8, 30, "Primary Credit Rate", 3},
+        {8, 30, "Secondary Credit Rate", 3},
+        {8, 30, "Seasonal Credit Rate", 3},
+        {8, 30, "Emergency Credit Rate", 3},
+        {8, 30, "Term Auction Facility Rate", 3},
+        {8, 30, "Term Securities Lending Facility Rate", 3},
+        {8, 30, "Primary Dealer Credit Facility Rate", 3},
+        {8, 30, "Asset-Backed Commercial Paper Money Market Mutual Fund Liquidity Facility Rate", 3},
+        {8, 30, "Commercial Paper Funding Facility Rate", 3},
+        {8, 30, "Money Market Investor Funding Facility Rate", 3},
+        {8, 30, "Term Asset-Backed Securities Loan Facility Rate", 3},
+        {8, 30, "Public-Private Investment Program Rate", 3},
+        {8, 30, "Consumer ABS TALF Rate", 3},
+        {8, 30, "SBA ABS TALF Rate", 3},
+        {8, 30, "CMBS TALF Rate", 3},
+        {8, 30, "Legacy CMBS TALF Rate", 3},
+        {8, 30, "New CMBS TALF Rate", 3},
+        {8, 30, "Agency CMBS TALF Rate", 3},
+        {8, 30, "Non-Agency CMBS TALF Rate", 3},
+        {8, 30, "Agency MBS TALF Rate", 3},
+        {8, 30, "Non-Agency MBS TALF Rate", 3},
+        {8, 30, "Agency CMO TALF Rate", 3},
+        {8, 30, "Non-Agency CMO TALF Rate", 3},
+        {8, 30, "Agency CMO TALF Rate", 3},
+        {8, 30, "Non-Agency CMO TALF Rate", 3}
+     };
+
+// Check if current time is within the avoidance window of any high-impact news
    for(int i = 0; i < ArraySize(highImpactNews); i++)
      {
       if(AvoidHighImpactNews && highImpactNews[i].impact >= 3)
@@ -686,15 +692,15 @@ bool IsNearHighImpactNews()
          int timeDiff = MathAbs((usHour * 60 + usMinute) - (highImpactNews[i].hour * 60 + highImpactNews[i].minute));
          if(timeDiff <= NewsAvoidanceMinutes)
            {
-            Print("Avoiding trading due to high-impact news: ", highImpactNews[i].name, 
+            Print("Avoiding trading due to high-impact news: ", highImpactNews[i].name,
                   " at ", highImpactNews[i].hour, ":", StringFormat("%02d", highImpactNews[i].minute), " EST");
             return true;
            }
         }
      }
-   
+
    return false;
-}
+  }
 
 //+------------------------------------------------------------------+
 //| Update lot size and daily status before placing orders           |
@@ -714,13 +720,17 @@ void UpdateLotSizeAndDailyStatus()
 // Update lot size based on today's performance
    if(today_profit < 0)
      {
-        if (total_deals > 5){
-            currentLot = Lots;
-            lastClosedDay = now.day;
+      if(total_deals > 5)
+        {
+         currentLot = Lots;
+         MqlDateTime now;
+         TimeToStruct(TimeCurrent(), now);
+         lastClosedDay = now.day;
         }
-        else{
-            currentLot = MathMin(total_volume+Lots, MaxLotSize);
-            Print("Today is losing. Total deals: ", total_deals, " Lot size set to: ", currentLot);
+      else
+        {
+         currentLot = MathMin(total_volume+Lots, MaxLotSize);
+         Print("Today is losing. Total deals: ", total_deals, " Lot size set to: ", currentLot);
 
         }
 
