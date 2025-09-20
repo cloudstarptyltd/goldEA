@@ -16,6 +16,7 @@ input double LotIncrement = 0.01; // Lot size increment for losing days
 input double MaxLotSize = 0.1; // Maximum lot size allowed
 input bool   UseDailyPnL = true; // Enable daily profit/loss management
 input bool   ShowDailyStatus = true; // Show daily profit/loss status
+input bool   TradeOnlyOnTuesday = true; // Trade only on Tuesdays
 
 //--- Global variables for daily P&L management
 datetime g_last_check_date = 0;
@@ -73,6 +74,25 @@ int OnInit()
    Print("Lot Increment: ", LotIncrement);
    Print("Max Lot Size: ", MaxLotSize);
    Print("Daily P&L Management: ", UseDailyPnL ? "Enabled" : "Disabled");
+   Print("Tuesday-Only Trading: ", TradeOnlyOnTuesday ? "Enabled" : "Disabled");
+   
+   // Show current day of week
+   MqlDateTime dt;
+   TimeToStruct(TimeCurrent(), dt);
+   string day_names[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+   Print("Current Day: ", day_names[dt.day_of_week]);
+   
+   if (TradeOnlyOnTuesday)
+   {
+      if (IsTuesday())
+      {
+         Print("Today is Tuesday - Trading is ACTIVE");
+      }
+      else
+      {
+         Print("Today is NOT Tuesday - Trading is DISABLED");
+      }
+   }
    
    // Check yesterday's status if enabled
    if (ShowDailyStatus)
@@ -206,6 +226,18 @@ bool IsNewDay()
    
    return false;
 }
+
+//+------------------------------------------------------------------+
+//| Function to check if today is Tuesday                            |
+//+------------------------------------------------------------------+
+bool IsTuesday()
+{
+   MqlDateTime dt;
+   TimeToStruct(TimeCurrent(), dt);
+   
+   // Tuesday is day of week 2 (Sunday=0, Monday=1, Tuesday=2, etc.)
+   return (dt.day_of_week == 2);
+}
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
 //+------------------------------------------------------------------+
@@ -215,6 +247,12 @@ void OnTick()
    if (IsNewDay() && UseDailyPnL)
    {
       CheckYesterdayStatus();
+   }
+   
+   // Check if Tuesday-only trading is enabled and today is not Tuesday
+   if (TradeOnlyOnTuesday && !IsTuesday())
+   {
+      return; // Skip trading on non-Tuesday days
    }
    
    // Check if we have open positions with our magic number
